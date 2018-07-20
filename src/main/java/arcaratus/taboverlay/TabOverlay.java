@@ -1,5 +1,6 @@
 package arcaratus.taboverlay;
 
+import baubles.common.container.ContainerPlayerExpanded;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.*;
@@ -17,7 +18,7 @@ import net.minecraftforge.common.config.Config;
 import net.minecraftforge.common.config.ConfigManager;
 import net.minecraftforge.fml.client.event.ConfigChangedEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
-import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.*;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -25,7 +26,7 @@ import org.lwjgl.input.Keyboard;
 
 import java.util.Locale;
 
-@Mod(modid = TabOverlay.MOD_ID, name = TabOverlay.NAME, version = TabOverlay.VERSION, clientSideOnly = true, guiFactory = "arcaratus.taboverlay.GuiOverlayConfig$Factory")
+@Mod(modid = TabOverlay.MOD_ID, name = TabOverlay.NAME, version = TabOverlay.VERSION, clientSideOnly = true, dependencies = "after:baubles@[1.5.2,)", guiFactory = "arcaratus.taboverlay.GuiOverlayConfig$Factory")
 @Mod.EventBusSubscriber(value = Side.CLIENT, modid = TabOverlay.MOD_ID)
 public class TabOverlay
 {
@@ -33,7 +34,10 @@ public class TabOverlay
     public static final String NAME = "Tab Overlay";
     public static final String VERSION = "@VERSION@";
 
+    private static final boolean baublesLoaded = Loader.isModLoaded("baubles");
+
     private static final ResourceLocation OVERLAY = new ResourceLocation(MOD_ID, "textures/gui/overlay.png");
+    private static final ResourceLocation BAUBLES_OVERLAY = new ResourceLocation(MOD_ID, "textures/gui/overlay_baubles.png");
 
     private static final int width = 176;
     private static final int height = 166;
@@ -48,6 +52,7 @@ public class TabOverlay
         Minecraft mc = Minecraft.getMinecraft();
         ScaledResolution res = new ScaledResolution(mc);
         EntityPlayer player = mc.player;
+        boolean baublesOverlay = baublesLoaded && ConfigHandler.baublesOverlay;
 
         if (mc.currentScreen == null && Keyboard.isKeyDown(KEY_OVERLAY.getKeyCode()))
         {
@@ -55,16 +60,15 @@ public class TabOverlay
             int j = (res.getScaledHeight() - height) / 2;
 
             GlStateManager.pushMatrix();
-            mc.getTextureManager().bindTexture(OVERLAY);
+            mc.getTextureManager().bindTexture(baublesOverlay ? BAUBLES_OVERLAY : OVERLAY);
             GlStateManager.enableBlend();
             GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
             GlStateManager.color(1.0F, 1.0F, 1.0F, (float) ConfigHandler.overlayOpacity);
-            drawTexturedModalRect(i, j, 0, 0, width, height);
+            drawTexturedModalRect(i + ConfigHandler.xOffset, j + ConfigHandler.yOffset, 0, 0, width, height);
             GlStateManager.disableBlend();
             GlStateManager.popMatrix();
 
             GlStateManager.disableRescaleNormal();
-//            RenderHelper.disableStandardItemLighting();
             GlStateManager.disableLighting();
             GlStateManager.disableDepth();
             RenderHelper.enableGUIStandardItemLighting();
@@ -77,12 +81,12 @@ public class TabOverlay
             for (int i1 = 0; i1 < player.inventoryContainer.inventorySlots.size(); ++i1)
             {
                 Slot slot = player.inventoryContainer.inventorySlots.get(i1);
-
                 if (slot.isEnabled())
-                {
                     drawSlot(mc, player, slot);
-                }
             }
+
+            if (baublesOverlay)
+                drawBaublesSlots(mc, player, i, j);
 
             GlStateManager.disableAlpha();
             GlStateManager.disableRescaleNormal();
@@ -90,14 +94,13 @@ public class TabOverlay
             GlStateManager.popMatrix();
             GlStateManager.enableLighting();
             GlStateManager.enableDepth();
-//            RenderHelper.enableStandardItemLighting();
         }
     }
 
     private static void drawSlot(Minecraft mc, EntityPlayer player, Slot slotIn)
     {
-        int i = slotIn.xPos;
-        int j = slotIn.yPos;
+        int i = slotIn.xPos + ConfigHandler.xOffset;
+        int j = slotIn.yPos + ConfigHandler.yOffset;
         ItemStack itemstack = slotIn.getStack();
         RenderItem itemRender = mc.getRenderItem();
         boolean flag1 = false;
@@ -106,7 +109,7 @@ public class TabOverlay
         {
             TextureAtlasSprite textureatlassprite = slotIn.getBackgroundSprite();
 
-            if (textureatlassprite != null)
+            if (textureatlassprite != null && (!baublesLoaded || !textureatlassprite.getIconName().equals("minecraft:items/empty_armor_slot_shield")))
             {
                 GlStateManager.disableLighting();
                 mc.getTextureManager().bindTexture(slotIn.getBackgroundLocation());
@@ -118,9 +121,29 @@ public class TabOverlay
 
         if (!flag1)
         {
+            if (baublesLoaded && ConfigHandler.baublesOverlay && slotIn.slotNumber == 45)
+            {
+                GlStateManager.enableDepth();
+                itemRender.renderItemAndEffectIntoGUI(player, itemstack, i + 19, j);
+                itemRender.renderItemOverlayIntoGUI(mc.fontRenderer, itemstack, i + 19, j, null);
+                return;
+            }
+
             GlStateManager.enableDepth();
             itemRender.renderItemAndEffectIntoGUI(player, itemstack, i, j);
             itemRender.renderItemOverlayIntoGUI(mc.fontRenderer, itemstack, i, j, null);
+        }
+    }
+
+    @Optional.Method(modid = "baubles")
+    private static void drawBaublesSlots(Minecraft mc, EntityPlayer player, int i, int j)
+    {
+        ContainerPlayerExpanded container = new ContainerPlayerExpanded(player.inventory, !player.getEntityWorld().isRemote, player);
+        for (int i1 = 0; i1 < container.inventorySlots.size(); i1++)
+        {
+            Slot slot = container.inventorySlots.get(i1);
+            if (slot.getHasStack() && slot.getSlotStackLimit()==1)
+                drawSlot(mc, player, slot);
         }
     }
 
@@ -170,8 +193,19 @@ public class TabOverlay
                 ConfigManager.sync(event.getModID(), Config.Type.INSTANCE);
         }
 
+        @Config.Comment({ "Adjust the X-position of the overlay." })
+        @Config.RangeInt(min = -1000, max = 1000)
+        public static int xOffset = 0;
+
+        @Config.Comment({ "Adjust the Y-position of the overlay." })
+        @Config.RangeInt(min = -1000, max = 1000)
+        public static int yOffset = 0;
+
         @Config.Comment({ "Toggle the opacity of the overlay." })
         @Config.RangeDouble(min = 0, max = 1)
         public static double overlayOpacity = 0.05;
+
+        @Config.Comment({ "Disable the Baubles overlay." })
+        public static boolean baublesOverlay = true;
     }
 }
