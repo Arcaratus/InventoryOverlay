@@ -1,10 +1,10 @@
 [
 {
-  "modid": "taboverlay",
-  "name": "Tab Overlay",
-  "description": "Adds in an inventory overlay on when you press TAB",
-  "version": "${version}",
-  "mcversion": "${mcversion}",
+  "modid": "inventoryoverlay",
+  "name": "Inventory Overlay",
+  "description": "Adds in an inventory overlay on when you press a button",
+  "version": "1.1.0",
+  "mcversion": "1.12.2",
   "url": "",
   "updateUrl": "",
   "authorList": ["Arcaratus"],

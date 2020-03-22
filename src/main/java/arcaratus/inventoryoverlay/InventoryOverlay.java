@@ -1,7 +1,8 @@
-package arcaratus.taboverlay;
+package arcaratus.inventoryoverlay;
 
 import baubles.common.container.ContainerPlayerExpanded;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -26,12 +27,12 @@ import org.lwjgl.input.Keyboard;
 
 import java.util.Locale;
 
-@Mod(modid = TabOverlay.MOD_ID, name = TabOverlay.NAME, version = TabOverlay.VERSION, clientSideOnly = true, dependencies = "after:baubles@[1.5.2,)", guiFactory = "arcaratus.taboverlay.GuiOverlayConfig$Factory")
-@Mod.EventBusSubscriber(value = Side.CLIENT, modid = TabOverlay.MOD_ID)
-public class TabOverlay
+@Mod(modid = InventoryOverlay.MOD_ID, name = InventoryOverlay.NAME, version = InventoryOverlay.VERSION, clientSideOnly = true, dependencies = "after:baubles@[1.5.2,)", guiFactory = "arcaratus.taboverlay.GuiOverlayConfig$Factory")
+@Mod.EventBusSubscriber(value = Side.CLIENT, modid = InventoryOverlay.MOD_ID)
+public class InventoryOverlay
 {
-    public static final String MOD_ID = "taboverlay";
-    public static final String NAME = "Tab Overlay";
+    public static final String MOD_ID = "inventoryoverlay";
+    public static final String NAME = "Inventory Overlay";
     public static final String VERSION = "@VERSION@";
 
     private static final boolean baublesLoaded = Loader.isModLoaded("baubles");
@@ -50,7 +51,7 @@ public class TabOverlay
     public static void onDrawScreenPost(RenderGameOverlayEvent.Post event)
     {
         Minecraft mc = Minecraft.getMinecraft();
-        ScaledResolution res = new ScaledResolution(mc);
+        ScaledResolution res = event.getResolution();
         EntityPlayer player = mc.player;
         boolean baublesOverlay = baublesLoaded && ConfigHandler.baublesOverlay;
 
@@ -59,24 +60,28 @@ public class TabOverlay
             int i = (res.getScaledWidth() - width) / 2;
             int j = (res.getScaledHeight() - height) / 2;
 
+            zLevel = -1000;
+
+            // Draw background image
+            GlStateManager.enableBlend();
+            GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+            GlStateManager.color(1.0F, 1.0F, 1.0F, (float) ConfigHandler.overlayOpacity);
+
             GlStateManager.pushMatrix();
             mc.getTextureManager().bindTexture(baublesOverlay ? BAUBLES_OVERLAY : OVERLAY);
-            GlStateManager.enableBlend();
-            GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, (float) ConfigHandler.overlayOpacity);
             drawTexturedModalRect(i + ConfigHandler.xOffset, j + ConfigHandler.yOffset, 0, 0, width, height);
-            GlStateManager.disableBlend();
             GlStateManager.popMatrix();
 
+            // Draw foreground
             GlStateManager.disableRescaleNormal();
-            GlStateManager.disableLighting();
             GlStateManager.disableDepth();
             RenderHelper.enableGUIStandardItemLighting();
-            GlStateManager.pushMatrix();
-            GlStateManager.translate((float)i, (float)j, 0.0F);
 
-            GlStateManager.enableAlpha();
+            GlStateManager.pushMatrix();
+            GlStateManager.translate((float)i, (float)j, 0);
+
             GlStateManager.enableRescaleNormal();
+            OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
 
             for (int i1 = 0; i1 < player.inventoryContainer.inventorySlots.size(); ++i1)
             {
@@ -92,8 +97,12 @@ public class TabOverlay
             GlStateManager.disableRescaleNormal();
 
             GlStateManager.popMatrix();
-            GlStateManager.enableLighting();
             GlStateManager.enableDepth();
+            RenderHelper.disableStandardItemLighting();
+
+            GlStateManager.color(1, 1, 1, 1); // Re-renders the food bar
+            zLevel = 0;
+            mc.getTextureManager().bindTexture(Gui.ICONS);
         }
     }
 
@@ -104,6 +113,9 @@ public class TabOverlay
         ItemStack itemstack = slotIn.getStack();
         RenderItem itemRender = mc.getRenderItem();
         boolean flag1 = false;
+
+        zLevel = 100.0F;
+        itemRender.zLevel = 100.0F;
 
         if (itemstack.isEmpty() && slotIn.isEnabled())
         {
@@ -119,19 +131,27 @@ public class TabOverlay
             }
         }
 
+        itemRender.zLevel = 0.0F;
+        zLevel = 0.0F;
+
         if (!flag1)
         {
+            zLevel = 200.0F;
+            itemRender.zLevel = 200.0F;
+
             if (baublesLoaded && ConfigHandler.baublesOverlay && slotIn.slotNumber == 45)
             {
-                GlStateManager.enableDepth();
                 itemRender.renderItemAndEffectIntoGUI(player, itemstack, i + 19, j);
                 itemRender.renderItemOverlayIntoGUI(mc.fontRenderer, itemstack, i + 19, j, null);
-                return;
+            }
+            else
+            {
+                itemRender.renderItemAndEffectIntoGUI(player, itemstack, i, j);
+                itemRender.renderItemOverlayIntoGUI(mc.fontRenderer, itemstack, i, j, null);
             }
 
-            GlStateManager.enableDepth();
-            itemRender.renderItemAndEffectIntoGUI(player, itemstack, i, j);
-            itemRender.renderItemOverlayIntoGUI(mc.fontRenderer, itemstack, i, j, null);
+            zLevel = 0.0F;
+            itemRender.zLevel = 0.0F;
         }
     }
 
@@ -152,10 +172,10 @@ public class TabOverlay
         Tessellator tessellator = Tessellator.getInstance();
         BufferBuilder bufferbuilder = tessellator.getBuffer();
         bufferbuilder.begin(7, DefaultVertexFormats.POSITION_TEX);
-        bufferbuilder.pos((double)(xCoord ), (double)(yCoord + heightIn), (double)zLevel).tex((double)textureSprite.getMinU(), (double)textureSprite.getMaxV()).endVertex();
-        bufferbuilder.pos((double)(xCoord + widthIn), (double)(yCoord + heightIn), (double)zLevel).tex((double)textureSprite.getMaxU(), (double)textureSprite.getMaxV()).endVertex();
-        bufferbuilder.pos((double)(xCoord + widthIn), (double)(yCoord), (double)zLevel).tex((double)textureSprite.getMaxU(), (double)textureSprite.getMinV()).endVertex();
-        bufferbuilder.pos((double)(xCoord), (double)(yCoord), (double)zLevel).tex((double)textureSprite.getMinU(), (double)textureSprite.getMinV()).endVertex();
+        bufferbuilder.pos(xCoord, yCoord + heightIn, zLevel).tex(textureSprite.getMinU(), textureSprite.getMaxV()).endVertex();
+        bufferbuilder.pos(xCoord + widthIn, yCoord + heightIn, zLevel).tex(textureSprite.getMaxU(), textureSprite.getMaxV()).endVertex();
+        bufferbuilder.pos(xCoord + widthIn, yCoord, zLevel).tex(textureSprite.getMaxU(), textureSprite.getMinV()).endVertex();
+        bufferbuilder.pos(xCoord, yCoord, zLevel).tex(textureSprite.getMinU(), textureSprite.getMinV()).endVertex();
         tessellator.draw();
     }
 
@@ -165,10 +185,10 @@ public class TabOverlay
         Tessellator tessellator = Tessellator.getInstance();
         BufferBuilder bufferbuilder = tessellator.getBuffer();
         bufferbuilder.begin(7, DefaultVertexFormats.POSITION_TEX);
-        bufferbuilder.pos((double)(x), (double)(y + height), (double)zLevel).tex((double)((float)(textureX) * f), (double)((float)(textureY + height) * f)).endVertex();
-        bufferbuilder.pos((double)(x + width), (double)(y + height), (double)zLevel).tex((double)((float)(textureX + width) * f), (double)((float)(textureY + height) * f)).endVertex();
-        bufferbuilder.pos((double)(x + width), (double)(y), (double)zLevel).tex((double)((float)(textureX + width) * f), (double)((float)(textureY) * f)).endVertex();
-        bufferbuilder.pos((double)(x), (double)(y), (double)zLevel).tex((double)((float)(textureX) * f), (double)((float)(textureY) * f)).endVertex();
+        bufferbuilder.pos(x, y + height, zLevel).tex((float) (textureX) * f, (float) (textureY + height) * f).endVertex();
+        bufferbuilder.pos(x + width, y + height, zLevel).tex((float) (textureX + width) * f, (float) (textureY + height) * f).endVertex();
+        bufferbuilder.pos(x + width, y, zLevel).tex((float) (textureX + width) * f, (float) textureY * f).endVertex();
+        bufferbuilder.pos(x, y, zLevel).tex((float) textureX * f, (float) textureY * f).endVertex();
         tessellator.draw();
     }
 
@@ -177,7 +197,7 @@ public class TabOverlay
     {
         public KeyBindingOverlay()
         {
-            super(MOD_ID + ".keybind.overlay".toLowerCase(Locale.ENGLISH), KeyConflictContext.IN_GAME, KeyModifier.NONE, Keyboard.KEY_TAB, NAME);
+            super(MOD_ID + ".keybind.overlay".toLowerCase(Locale.ENGLISH), KeyConflictContext.IN_GAME, KeyModifier.NONE, Keyboard.KEY_GRAVE, NAME);
             ClientRegistry.registerKeyBinding(this);
         }
     }

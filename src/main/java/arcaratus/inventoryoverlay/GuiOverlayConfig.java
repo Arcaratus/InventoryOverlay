@@ -1,4 +1,4 @@
-package arcaratus.taboverlay;
+package arcaratus.inventoryoverlay;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
@@ -12,7 +12,7 @@ public class GuiOverlayConfig extends GuiConfig
 {
     public GuiOverlayConfig(GuiScreen parentScreen)
     {
-        super(parentScreen, ConfigElement.from(TabOverlay.ConfigHandler.class).getChildElements(), TabOverlay.MOD_ID, false, false, TabOverlay.NAME);
+        super(parentScreen, ConfigElement.from(InventoryOverlay.ConfigHandler.class).getChildElements(), InventoryOverlay.MOD_ID, false, false, InventoryOverlay.NAME);
     }
 
     public static class Factory implements IModGuiFactory
