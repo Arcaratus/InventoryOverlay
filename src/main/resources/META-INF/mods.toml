@@ -1,0 +1,20 @@
+modLoader="javafml" #mandatory
+loaderVersion="[33,)"
+license="IDGAF License"
+issueTrackerURL="https://github.com/Arcaratus/InventoryOverlay/issues" #optional
+displayURL="" #optional
+logoFile="logo.png" #optional
+credits="" #optional
+authors="Arcaratus" #optional
+
+[[mods]]
+modId="inventoryoverlay"
+version="${file.jarVersion}"
+displayName="Inventory Overlay"
+description='''
+Adds in an inventory overlay'''
+
+[[dependencies.inventoryoverlay]]
+    modId="forge"
+    mandatory=true
+    versionRange="[34.1.0,)"
